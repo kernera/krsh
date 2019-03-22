@@ -1,0 +1,9 @@
+#!/bin/sh
+
+[ $# -gt 0 ] || exit 1
+
+device=${1}
+session=$(basename $device)
+baudrate=${2:-115200}
+
+exec screen -x -R $session $device $baudrate

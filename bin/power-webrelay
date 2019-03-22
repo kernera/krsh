@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# WebRelay command line
+
+WEBRELAY_HOST=${WEBRELAY_HOST:-192.168.1.2}
+
+state () {
+  > /dev/null curl -s http://$WEBRELAY_HOST/state.xml?relayState=$1
+}
+
+while getopts "H:opr" o
+do
+  case "${o}" in
+    H) WEBRELAY_HOST=${OPTARG} ;;
+    o) state 1 ;;
+    p) state 0 ;;
+    r) state 0 ; sleep 2 ; state 1 ;;
+    *) exit 1 ;;
+  esac
+done

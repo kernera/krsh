@@ -1,0 +1,89 @@
+#!/bin/sh
+#
+# Synaccess netBooter NP-08 command line
+
+SYNACCESS_USER=${SYNACCESS_USER:-admin}
+SYNACCESS_PASS=${SYNACCESS_PASS:-admin}
+SYNACCESS_HOST=${SYNACCESS_HOST:-netbooter}
+
+print () {
+  [ -n "$QUIET" ] || printf "$@"
+}
+
+get () {
+  # FIXME cannot error out if the host is unavailable
+  curl -Ss -u $SYNACCESS_USER:$SYNACCESS_PASS http://$SYNACCESS_HOST/$1
+}
+
+status () {
+  get synOpStatus.shtml | grep pwrRb$1.cgi | grep -oP '(?<=led)on|off(?=\.gif)'
+}
+
+sw () {
+  >/dev/null get pwrSw$1.cgi # toggles on/off
+}
+
+rb () {
+  >/dev/null get pwrRb$1.cgi # toggles twice
+}
+
+wait () {
+  port=$1
+  shift
+
+  print $port
+  for i
+  do
+    while true
+    do
+      # Wait and trigger a status request otherwise the action may be ignored
+      print .
+      sleep .5
+      [ $(status $port) = $i ] && break
+    done
+    print $i
+  done
+  print "\n"
+}
+
+on () {
+  if [ $(status $1) = off ]
+  then
+    sw $1
+    wait $1 on
+  fi
+}
+
+off () {
+  if [ $(status $1) = on ]
+  then
+    sw $1
+    wait $1 off
+  fi
+}
+
+reboot () {
+  if [ $(status $1) = on ]
+  then
+    rb $1
+    wait $1 off on
+  else
+    sw $1
+    wait $1 on
+  fi
+}
+
+while getopts "H:U:P:o:p:r:s:q" o
+do
+  case "${o}" in
+    H) SYNACCESS_HOST=${OPTARG} ;;
+    U) SYNACCESS_USER=${OPTARG} ;;
+    P) SYNACCESS_PASS=${OPTARG} ;;
+    q) QUIET=1 ;;
+    o) on ${OPTARG} ;;
+    p) off ${OPTARG} ;;
+    r) reboot ${OPTARG} ;;
+    s) status ${OPTARG} ;;
+    *) exit 1 ;;
+  esac
+done

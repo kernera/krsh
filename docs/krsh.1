@@ -1,0 +1,604 @@
+'\" t
+.\"     Title: krsh
+.\"    Author: [see the "AUTHOR(S)" section]
+.\" Generator: Asciidoctor 2.0.10
+.\"      Date: 2020-10-05
+.\"    Manual: \ \&
+.\"    Source: \ \&
+.\"  Language: English
+.\"
+.TH "KRSH" "1" "2020-10-05" "\ \&" "\ \&"
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.ss \n[.ss] 0
+.nh
+.ad l
+.de URL
+\fI\\$2\fP <\\$1>\\$3
+..
+.als MTO URL
+.if \n[.g] \{\
+.  mso www.tmac
+.  am URL
+.    ad l
+.  .
+.  am MTO
+.    ad l
+.  .
+.  LINKSTYLE blue R < >
+.\}
+.SH "NAME"
+krsh \- Kernera restricted shell, for sharing access to embedded hardware
+.SH "SYNOPSIS"
+.sp
+krsh [\fIoptions\fP] [\fIcommand_file\fP]
+.sp
+krsh [\fIoptions\fP] \-c \fIcommand_string\fP
+.sp
+krsh [\fIoptions\fP] \-s
+.SH "DESCRIPTION"
+.sp
+The krsh(1) shell is a command language interpreter that shall execute command read from a command line string, the standard input, or a specified file.
+.sp
+It is usually used interactively as a login shell on a remote server for sharing access between multiple users to hardware such as serial ports, power supplies or development boards, while abstracting system specific details.
+.SS "Design"
+.sp
+This section describes a few paradigms used to develop krsh.
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.  sp -1
+.  IP \(bu 2.3
+.\}
+This project has no notion of authentication whatsoever.
+If authentication is needed (which is often the case), the shell must be used as a login shell and accessed via SSH, which deals with the preferred method.
+Therefore there is no convention to describe or split the access to a embedded work bench, it is up to the user to abstract all hardware behind a single krsh user, having one krsh user per target machines, or even one krsh user per human accessing the hardware.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.  sp -1
+.  IP \(bu 2.3
+.\}
+If possible, hardware and physical details such as IP addresses or TTY devices shouldn\(cqt be exposed to the user, they are only described in the configuration file and used internally by the shell.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.  sp -1
+.  IP \(bu 2.3
+.\}
+The shell is not distributed and thus only describes hardware physically accessible via the machine itself where krsh is executed.
+.RE
+.SS "Installation"
+.sp
+This section describes how to install krsh from source as a login shell for a new user \fIbench\fP.
+.if n .sp
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+.B Note
+.ps -1
+.br
+.sp
+krsh does not use a compilation utility yet, therefore its installation is manual and executable paths are hardcoded relative to the current working directory.
+.sp .5v
+.RE
+.sp
+Download and compile krsh from source with:
+.sp
+.if n .RS 4
+.nf
+# cd /opt
+# git clone https://github.com/kernera/krsh
+# cd krsh
+# make krsh
+.fi
+.if n .RE
+.sp
+Create a new user \fIbench\fP and define its login shell with:
+.sp
+.if n .RS 4
+.nf
+# useradd \-s /opt/krsh/krsh \-m bench
+# touch /home/bench/.krshrc
+.fi
+.if n .RE
+.sp
+Test krsh with:
+.sp
+.if n .RS 4
+.nf
+# su \-l bench help
+.fi
+.if n .RE
+.sp
+Assuming that key authentication is already configured on the server, it is convenient to configure SSH on a remote client with the following host:
+.sp
+.B ~/.ssh/config
+.br
+.sp
+.if n .RS 4
+.nf
+Host bench
+        HostName remote.server.com
+        RequestTTY yes
+        User bench
+.fi
+.if n .RE
+.sp
+Accessing the restricted shell from a remote client becomes as intuitive as:
+.sp
+.if n .RS 4
+.nf
+$ ssh bench
+Last login: Mon Oct  5 16:39:45 2020 from 192.168.1.1
+Welcome to Kernera restricted shell!
+Try \(aqhelp\(aq or ^D to quit.
+[0] krsh>
+.fi
+.if n .RE
+.SS "Syntax"
+.sp
+Lines starting with a \fI#\fP are considered a comment and ignored.
+Commands are separated by \fI;\fP or a newline.
+The first word is the command itself, following words are arguments.
+.sp
+The following snippet calls two commands "foo" and "bar" with respective arguments a, b, c and d, e, f:
+.sp
+.if n .RS 4
+.nf
+krsh> foo a b c ; bar d e f
+.fi
+.if n .RE
+.SS "Builtins"
+.sp
+The shell includes the following builtin commands:
+.sp
+\fBhelp\fP
+.RS 4
+List or describe command(s).
+.RE
+.sp
+\fBpower\fP
+.RS 4
+List power compatible units.
+.RE
+.sp
+\fBpoweron\fP
+.RS 4
+Power on some or all power units.
+.RE
+.sp
+\fBpoweroff\fP
+.RS 4
+Power off some or all power units.
+.RE
+.sp
+\fBreboot\fP
+.RS 4
+Reboot some or all power units.
+.RE
+.sp
+\fBremote\fP
+.RS 4
+List remote units or connect to a remote host unit.
+.RE
+.sp
+\fBssh\fP
+.RS 4
+Alias for remote.
+.RE
+.sp
+\fBscp\fP
+.RS 4
+Adapter for file transfer over SSH.
+.RE
+.sp
+\fBtty\fP
+.RS 4
+List TTY compatible units or access a serial port.
+.RE
+.sp
+For more information about a command and its arguments, type \fBhelp \fIcommand\fP\fP.
+.SS "Debugging"
+.sp
+All non\-user messages are sent to the system logger.
+On a system using systemd, debug messages and system errors can be tracked with:
+.sp
+.if n .RS 4
+.nf
+# journalctl \-f \-t krsh \-t \-krsh
+.fi
+.if n .RE
+.SH "OPTIONS"
+.sp
+\fB\-c\fP
+.RS 4
+Read commands from the \fIcommand_string\fP operand.
+.RE
+.sp
+\fB\-i\fP
+.RS 4
+Specify that the shell is interactive.
+.RE
+.sp
+\fB\-s\fP
+.RS 4
+Read commands from the standard input.
+.RE
+.sp
+If there are no operands and the \fB\-c\fP option is not specified, the \fB\-s\fP option is assumed.
+.sp
+If the \fB\-i\fP option is present, or if there are no operands and the shell\(cqs standard input and standard output are attached to a terminal, the shell is considered to be interactive.
+.SH "CONFIGURATION"
+.sp
+By default, krsh looks for the configuration file \fI.krshrc\fP in the current working directory.
+.sp
+The configuration file is a plain text ini\-style file describing units, inspired from the syntax used in systemd unit files.
+.sp
+Each section describes a single unit.
+The section title describes the unit type and its properties describe common unit properties or type\-specific properties.
+A property may refer to the name of a previously described unit or simply a text value.
+Both section titles and properties use the upper camel case syntax.
+.sp
+The following configuration options are common to all unit types.
+.sp
+Name=
+.RS 4
+A unique identifier for the unit.
+Units refer to each other using this string.
+.RE
+.sp
+Description=
+.RS 4
+A human readable label describing the unit.
+.RE
+.SS "[Command] UNITS"
+.sp
+This section describes units of the command subsystem.
+A command is a generic user\-specified program added to the existing set of commands.
+The unit \fIName=\fP identifies the command interpreted by the shell.
+Additional arguments are passed to the program as is.
+.sp
+Path=
+.RS 4
+Pathname of the program passed to \fBexecv(3)\fP.
+It must be absolute or relative to the shell binary and point to an executable file.
+.RE
+.sp
+Synopsis=
+.RS 4
+Optional string describing the command usage.
+.RE
+.sp
+The following example adds a "list" command which lists the binary images found in the TFTP directory.
+.sp
+.B \&.krshrc
+.br
+.sp
+.if n .RS 4
+.nf
+[Command]
+Name=list
+Description=List binary images bootable via TFTP.
+Path=/opt/tftplist.sh
+Synopsis=list [type]
+.fi
+.if n .RE
+.sp
+.B /opt/tftplist.sh
+.br
+.sp
+.if n .RS 4
+.nf
+#!/bin/bash
+
+cd /srv/tftp
+
+set \-\- ${*:\-linux oftree initramfs}
+
+for type in $*
+do
+  case $type in
+    linux) file * | grep \(aqARM OpenFirmware\(aq | cut \-d: \-f1 ;;
+    oftree) file * | grep \(aqDevice Tree Blob\(aq | cut \-d: \-f1 ;;
+    initramfs) file * | grep \(aqASCII cpio archive\(aq | cut \-d: \-f1 ;;
+    *) echo "Invalid type $type." >&2 ; exit 1 ;;
+  esac
+done
+.fi
+.if n .RE
+.sp
+.B Example:
+.br
+.sp
+.if n .RS 4
+.nf
+krsh> list
+zImage
+vf610\-zii\-dev\-rev\-b.dtb
+vf610\-zii\-dev\-rev\-c.dtb
+rootfs.cpio
+.fi
+.if n .RE
+.SS "[Directory] UNITS"
+.sp
+This section describes units of the directory subsystem.
+A directory unit is used to filter file transfer via SSH.
+The unit \fIName=\fP identifies the directory used during the invocation of \fBscp(1)\fP.
+Only uploading is allowed at the moment.
+.sp
+Path=
+.RS 4
+Real path to the directory passed to \fBscp(1)\fP.
+.RE
+.sp
+The following example exposes a "tftpboot" directory pointing to \fI/srv/tftp/myboard/\fP used to upload bootable images.
+.sp
+.B \&.krshrc
+.br
+.sp
+.if n .RS 4
+.nf
+[Command]
+Name=tftpboot
+Description=Directory containing bootable images
+Path=/srv/tftp/myboard
+.fi
+.if n .RE
+.sp
+Assuming that this shell is installed as the login shell for the user "bench" on the host "server", the following command uploads the "zImage" file to the TFTP directory:
+.sp
+.if n .RS 4
+.nf
+scp ./build/zImage bench@server:tftpboot/
+.fi
+.if n .RE
+.SS "[Link] UNITS"
+.sp
+This section describes units of the link subsystem.
+A link unit is used to describe a network cable connecting a local interface to a remote interface.
+Such unit has no usage at the moment except for documentation purpose.
+.sp
+LocalInterface=
+.RS 4
+Name of the local network interface.
+.RE
+.sp
+RemoteInterface=
+.RS 4
+Name of the network interface on the remote machine.
+.RE
+.sp
+Remote=
+.RS 4
+Name of the remote unit.
+.RE
+.sp
+The following example describes a network cable connected to the machine "foobar".
+.sp
+.B \&.krshrc
+.br
+.sp
+.if n .RS 4
+.nf
+[Remote]
+Name=foobar
+
+[Link]
+LocalInterface=enp0s2
+RemoteInterface=eth1
+Remote=foobar
+.fi
+.if n .RE
+.SS "[Power] UNITS"
+.sp
+This section describes units of the power subsystem.
+A power unit describes a single port of a power distribution unit.
+.sp
+Driver=
+.RS 4
+Name of the builtin driver used to control the power distribution unit.
+The list of supported power drivers include \fBsynaccess\fP (for the NetBooter family) and \fBwebrelay\fP (for the WebRelay device).
+.RE
+.sp
+Hostname=
+.RS 4
+Network name or address of the power distribution unit.
+.RE
+.sp
+Port=
+.RS 4
+Number of the port on the power distribution unit.
+.RE
+.sp
+The following example power cycle the "foobar" board connected on the port 3 of a Synaccess device.
+.sp
+.B \&.krshrc
+.br
+.sp
+.if n .RS 4
+.nf
+[Power]
+Name=pdu3
+Driver=synaccess
+Hostname=192.168.42.100
+Port=3
+
+[Remote]
+Name=foobar
+Power=pdu3
+.fi
+.if n .RE
+.sp
+.B Example
+.br
+.sp
+.if n .RS 4
+.nf
+krsh> reboot foobar
+.fi
+.if n .RE
+.SS "[Remote] UNITS"
+.sp
+This section describes units of the remote subsystem.
+A remote unit groups a directory, power and TTY, and describes the logging into a remote machine.
+.sp
+Hostname=
+.RS 4
+Network address or name of the remote machine.
+.RE
+.sp
+User=
+.RS 4
+Name of the user to log in as on the remote machine.
+.RE
+.sp
+Password=
+.RS 4
+User password to log in on the remote machine.
+.RE
+.sp
+Directory=
+.RS 4
+Name of the directory unit associated with this remote.
+.RE
+.sp
+Power=
+.RS 4
+Name of the power unit associated with this remote.
+.RE
+.sp
+TTY=
+.RS 4
+Name of the TTY unit associated with this remote.
+.RE
+.sp
+The following example executes a command on a remote machine "foobar".
+.sp
+.B \&.krshrc
+.br
+.sp
+.if n .RS 4
+.nf
+[remote]
+Name=foobar
+Hostname=192.168.42.203
+User=root
+Password=w00t
+.fi
+.if n .RE
+.sp
+.B Example
+.br
+.sp
+.if n .RS 4
+.nf
+krsh> remote foobar uname \-a
+Linux foobar 5.8.0\-rc1 #89 Thu Jun 25 21:32:33 EDT 2020 armv7l GNU/Linux
+.fi
+.if n .RE
+.if n .sp
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+.B Note
+.ps -1
+.br
+.sp
+Accessing a remote makes use of \fBssh(1)\fP and \fBsshpass(1)\fP if \fIPassword=\fP is defined, thus these packages must be installed.
+.sp .5v
+.RE
+.SS "[TTY] UNITS"
+.sp
+This section describes units of the TTY subsystem.
+A TTY unit provides shared connection to a serial interface.
+If two users access a TTY unit at the same time, both will have read and write access to it.
+.if n .sp
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+.B Note
+.ps -1
+.br
+.sp
+Non\-root system users of the shell must be part of a specific group to access serial ports, such as "dialout" or "uucp" (see \f(CRls \-l /dev/\fP).
+.sp .5v
+.RE
+.sp
+Device=
+.RS 4
+Pathname of the local serial port.
+.RE
+.sp
+Baudrate=
+.RS 4
+Optional baudrate for the serial port.
+.RE
+.sp
+The following example exposes \fI/dev/ttyUSB0\fP as "tty0".
+.sp
+.B krshrc
+.br
+.sp
+.if n .RS 4
+.nf
+[TTY]
+Name=tty0
+Device=/dev/ttyUSB0
+Baudrate=115200
+.fi
+.if n .RE
+.if n .sp
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+.B Note
+.ps -1
+.br
+.sp
+The current TTY driver use \fBdtach(1)\fP and \fBpicocom(1)\fP to share a serial port, thus these packages must be installed.
+.sp .5v
+.RE
+.SH "SEE ALSO"
+.sp
+chsh(1), ssh(1), scp(1)
+.SH "AUTHORS"
+.sp
+krsh is written by Vivien Didelot and other contributors.
+.SH "RESOURCES"
+.sp
+\fBProject web site:\fP \c
+.URL "https://kernera.github.io/krsh" "" ""
+.sp
+\fBGit source repository and issue tracker:\fP \c
+.URL "https://github.com/kernera/krsh" "" ""
+.sp
+\fBManual page:\fP krsh(1)
+.SH "COPYING"
+.sp
+Copyright \(co Vivien Didelot.
+.sp
+Free use of this software is granted under the terms of the \fIGPLv3+\fP License.

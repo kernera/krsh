@@ -1,0 +1,12 @@
+#!/bin/sh
+
+[ $# -gt 0 ] || exit 1
+
+device=${1}
+session=/tmp/dtach.picocom.$(basename $device).session
+baudrate=${2:-115200}
+
+echo "Press Enter to continue, then ^\ to detach."
+read
+
+exec dtach -A $session picocom -b $baudrate $device

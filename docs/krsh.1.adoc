@@ -1,0 +1,407 @@
+:toc:
+
+= krsh(1)
+
+== NAME
+
+krsh - Kernera restricted shell, for sharing access to embedded hardware
+
+== SYNOPSIS
+
+krsh [_options_] [_command_file_]
+
+krsh [_options_] -c _command_string_
+
+krsh [_options_] -s
+
+== DESCRIPTION
+
+The krsh(1) shell is a command language interpreter that shall execute command read from a command line string, the standard input, or a specified file.
+
+It is usually used interactively as a login shell on a remote server for sharing access between multiple users to hardware such as serial ports, power supplies or development boards, while abstracting system specific details.
+
+=== Design
+
+This section describes a few paradigms used to develop krsh.
+
+* This project has no notion of authentication whatsoever.
+If authentication is needed (which is often the case), the shell must be used as a login shell and accessed via SSH, which deals with the preferred method.
+Therefore there is no convention to describe or split the access to a embedded work bench, it is up to the user to abstract all hardware behind a single krsh user, having one krsh user per target machines, or even one krsh user per human accessing the hardware.
+* If possible, hardware and physical details such as IP addresses or TTY devices shouldn't be exposed to the user, they are only described in the configuration file and used internally by the shell.
+* The shell is not distributed and thus only describes hardware physically accessible via the machine itself where krsh is executed.
+
+=== Installation
+
+This section describes how to install krsh from source as a login shell for a new user _bench_.
+
+NOTE: krsh does not use a compilation utility yet, therefore its installation is manual and executable paths are hardcoded relative to the current working directory.
+
+Download and compile krsh from source with:
+
+----
+# cd /opt
+# git clone https://github.com/kernera/krsh
+# cd krsh
+# make krsh
+----
+
+Create a new user _bench_ and define its login shell with:
+
+----
+# useradd -s /opt/krsh/krsh -m bench
+# touch /home/bench/.krshrc
+----
+
+Test krsh with:
+
+----
+# su -l bench help
+----
+
+Assuming that key authentication is already configured on the server, it is convenient to configure SSH on a remote client with the following host:
+
+.~/.ssh/config
+----
+Host bench
+	HostName remote.server.com
+	RequestTTY yes
+	User bench
+----
+
+Accessing the restricted shell from a remote client becomes as intuitive as:
+
+----
+$ ssh bench 
+Last login: Mon Oct  5 16:39:45 2020 from 192.168.1.1
+Welcome to Kernera restricted shell!
+Try 'help' or ^D to quit.
+[0] krsh>
+----
+
+=== Syntax
+
+Lines starting with a _#_ are considered a comment and ignored.
+Commands are separated by _;_ or a newline.
+The first word is the command itself, following words are arguments.
+
+The following snippet calls two commands "foo" and "bar" with respective arguments a, b, c and d, e, f:
+
+----
+krsh> foo a b c ; bar d e f
+----
+
+=== Builtins
+
+The shell includes the following builtin commands:
+
+*help*::
+List or describe command(s).
+
+*power*::
+List power compatible units.
+
+*poweron*::
+Power on some or all power units.
+
+*poweroff*::
+Power off some or all power units.
+
+*reboot*::
+Reboot some or all power units.
+
+*remote*::
+List remote units or connect to a remote host unit.
+
+*ssh*::
+Alias for remote.
+
+*scp*::
+Adapter for file transfer over SSH.
+
+*tty*::
+List TTY compatible units or access a serial port.
+
+For more information about a command and its arguments, type *help _command_*.
+
+=== Debugging
+
+All non-user messages are sent to the system logger.
+On a system using systemd, debug messages and system errors can be tracked with:
+
+----
+# journalctl -f -t krsh -t -krsh
+----
+
+== OPTIONS
+
+*-c*::
+Read commands from the _command_string_ operand.
+
+*-i*::
+Specify that the shell is interactive.
+
+*-s*::
+Read commands from the standard input.
+
+If there are no operands and the *-c* option is not specified, the *-s* option is assumed.
+
+If the *-i* option is present, or if there are no operands and the shell's standard input and standard output are attached to a terminal, the shell is considered to be interactive.
+
+== CONFIGURATION
+
+By default, krsh looks for the configuration file _.krshrc_ in the current working directory.
+
+The configuration file is a plain text ini-style file describing units, inspired from the syntax used in systemd unit files.
+
+Each section describes a single unit.
+The section title describes the unit type and its properties describe common unit properties or type-specific properties.
+A property may refer to the name of a previously described unit or simply a text value.
+Both section titles and properties use the upper camel case syntax.
+
+The following configuration options are common to all unit types.
+
+Name=::
+A unique identifier for the unit.
+Units refer to each other using this string.
+
+Description=::
+A human readable label describing the unit.
+
+=== [Command] UNITS
+
+This section describes units of the command subsystem.
+A command is a generic user-specified program added to the existing set of commands.
+The unit _Name=_ identifies the command interpreted by the shell.
+Additional arguments are passed to the program as is.
+
+Path=::
+Pathname of the program passed to *execv(3)*.
+It must be absolute or relative to the shell binary and point to an executable file.
+
+Synopsis=::
+Optional string describing the command usage.
+
+The following example adds a "list" command which lists the binary images found in the TFTP directory.
+
+..krshrc
+[source,ini]
+----
+[Command]
+Name=list
+Description=List binary images bootable via TFTP.
+Path=/opt/tftplist.sh
+Synopsis=list [type]
+----
+
+./opt/tftplist.sh
+[source,sh]
+----
+#!/bin/bash
+
+cd /srv/tftp
+
+set -- ${*:-linux oftree initramfs}
+
+for type in $*
+do
+  case $type in
+    linux) file * | grep 'ARM OpenFirmware' | cut -d: -f1 ;;
+    oftree) file * | grep 'Device Tree Blob' | cut -d: -f1 ;;
+    initramfs) file * | grep 'ASCII cpio archive' | cut -d: -f1 ;;
+    *) echo "Invalid type $type." >&2 ; exit 1 ;;
+  esac
+done
+----
+
+.Example:
+----
+krsh> list
+zImage
+vf610-zii-dev-rev-b.dtb
+vf610-zii-dev-rev-c.dtb
+rootfs.cpio
+----
+
+=== [Directory] UNITS
+
+This section describes units of the directory subsystem.
+A directory unit is used to filter file transfer via SSH.
+The unit _Name=_ identifies the directory used during the invocation of *scp(1)*.
+Only uploading is allowed at the moment.
+
+Path=::
+Real path to the directory passed to *scp(1)*.
+
+The following example exposes a "tftpboot" directory pointing to _/srv/tftp/myboard/_ used to upload bootable images.
+
+..krshrc
+[source,ini]
+----
+[Command]
+Name=tftpboot
+Description=Directory containing bootable images
+Path=/srv/tftp/myboard
+----
+
+Assuming that this shell is installed as the login shell for the user "bench" on the host "server", the following command uploads the "zImage" file to the TFTP directory:
+
+----
+scp ./build/zImage bench@server:tftpboot/
+----
+
+=== [Link] UNITS
+
+This section describes units of the link subsystem.
+A link unit is used to describe a network cable connecting a local interface to a remote interface.
+Such unit has no usage at the moment except for documentation purpose.
+
+LocalInterface=::
+Name of the local network interface.
+
+RemoteInterface=::
+Name of the network interface on the remote machine.
+
+Remote=::
+Name of the remote unit.
+
+The following example describes a network cable connected to the machine "foobar".
+
+..krshrc
+[source,ini]
+----
+[Remote]
+Name=foobar
+
+[Link]
+LocalInterface=enp0s2
+RemoteInterface=eth1
+Remote=foobar
+----
+
+=== [Power] UNITS
+
+This section describes units of the power subsystem.
+A power unit describes a single port of a power distribution unit.
+
+Driver=::
+Name of the builtin driver used to control the power distribution unit.
+The list of supported power drivers include *synaccess* (for the NetBooter family) and *webrelay* (for the WebRelay device).
+
+Hostname=::
+Network name or address of the power distribution unit.
+
+Port=::
+Number of the port on the power distribution unit.
+
+The following example power cycle the "foobar" board connected on the port 3 of a Synaccess device.
+
+..krshrc
+[source,ini]
+----
+[Power]
+Name=pdu3
+Driver=synaccess
+Hostname=192.168.42.100
+Port=3
+
+[Remote]
+Name=foobar
+Power=pdu3
+----
+
+.Example
+----
+krsh> reboot foobar
+----
+
+=== [Remote] UNITS
+
+This section describes units of the remote subsystem.
+A remote unit groups a directory, power and TTY, and describes the logging into a remote machine.
+
+Hostname=::
+Network address or name of the remote machine.
+
+User=::
+Name of the user to log in as on the remote machine.
+
+Password=::
+User password to log in on the remote machine.
+
+Directory=::
+Name of the directory unit associated with this remote.
+
+Power=::
+Name of the power unit associated with this remote.
+
+TTY=::
+Name of the TTY unit associated with this remote.
+
+The following example executes a command on a remote machine "foobar".
+
+..krshrc
+[source,ini]
+----
+[remote]
+Name=foobar
+Hostname=192.168.42.203
+User=root
+Password=w00t
+----
+
+.Example
+----
+krsh> remote foobar uname -a
+Linux foobar 5.8.0-rc1 #89 Thu Jun 25 21:32:33 EDT 2020 armv7l GNU/Linux
+----
+
+NOTE: Accessing a remote makes use of *ssh(1)* and *sshpass(1)* if _Password=_ is defined, thus these packages must be installed.
+
+=== [TTY] UNITS
+
+This section describes units of the TTY subsystem.
+A TTY unit provides shared connection to a serial interface.
+If two users access a TTY unit at the same time, both will have read and write access to it.
+
+NOTE: Non-root system users of the shell must be part of a specific group to access serial ports, such as "dialout" or "uucp" (see `ls -l /dev/`).
+
+Device=::
+Pathname of the local serial port.
+
+Baudrate=::
+Optional baudrate for the serial port.
+
+The following example exposes _/dev/ttyUSB0_ as "tty0".
+
+.krshrc
+[source,ini]
+----
+[TTY]
+Name=tty0
+Device=/dev/ttyUSB0
+Baudrate=115200
+----
+
+NOTE: The current TTY driver use *dtach(1)* and *picocom(1)* to share a serial port, thus these packages must be installed.
+
+== SEE ALSO
+
+chsh(1), ssh(1), scp(1)
+
+== AUTHORS
+
+krsh is written by Vivien Didelot and other contributors.
+
+== RESOURCES
+
+*Project web site:* https://kernera.github.io/krsh
+
+*Git source repository and issue tracker:* https://github.com/kernera/krsh
+
+*Manual page:* krsh(1)
+
+== COPYING
+
+Copyright (C) Vivien Didelot.
+
+Free use of this software is granted under the terms of the _GPLv3+_ License.

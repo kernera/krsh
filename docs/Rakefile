@@ -1,0 +1,6 @@
+require 'asciidoctor'
+
+task :default do
+  Asciidoctor.convert_file 'README.adoc', safe: :unsafe, to_file: 'index.html', attributes: { 'reproducible' => true, 'toc' => 'left' }
+  Asciidoctor.convert_file 'krsh.1.adoc', safe: :unsafe, backend: :manpage
+end
