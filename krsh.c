@@ -12,14 +12,19 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define user(fmt, ...) \
-	dprintf(STDERR_FILENO, fmt "\n", ##__VA_ARGS__)
+#define ERR_MSG "An error was reported to the system logger.\n"
 
 #define crit(fmt, ...) \
-	syslog(LOG_CRIT, fmt, ##__VA_ARGS__)
+	{ \
+		dprintf(STDERR_FILENO, ERR_MSG); \
+		syslog(LOG_CRIT, fmt ": %s", ##__VA_ARGS__, strerror(errno)); \
+	}
 
 #define err(fmt, ...) \
-	syslog(LOG_ERR, fmt, ##__VA_ARGS__)
+	{ \
+		dprintf(STDERR_FILENO, ERR_MSG); \
+		syslog(LOG_ERR, fmt, ##__VA_ARGS__); \
+	}
 
 #define notice(fmt, ...) \
 	syslog(LOG_NOTICE, fmt, ##__VA_ARGS__)
@@ -28,7 +33,16 @@
 	syslog(LOG_INFO, fmt, ##__VA_ARGS__)
 
 #define debug(fmt, ...) \
-	syslog(LOG_DEBUG, fmt, ##__VA_ARGS__)
+	syslog(LOG_DEBUG, "%s: " fmt, __func__, ##__VA_ARGS__)
+
+#define user(fmt, ...) \
+	{ \
+		dprintf(STDERR_FILENO, fmt "\n", ##__VA_ARGS__); \
+		syslog(LOG_DEBUG, ">&2 " fmt, ##__VA_ARGS__); \
+	}
+
+#define print(fmt, ...) \
+	dprintf(STDOUT_FILENO, fmt, ##__VA_ARGS__)
 
 struct command;
 struct directory;
@@ -282,8 +296,8 @@ static int builtin_exec(int argc, char *argv[])
 
 	pid = fork();
 	if (pid == -1) {
-		crit("Failed to fork: %s", strerror(errno));
-		return 1; /* TODO: exit? */
+		crit("fork");
+		return 1;
 	}
 
 	if (pid == 0) {
@@ -301,12 +315,12 @@ static int builtin_exec(int argc, char *argv[])
 			if (errno == EINTR)
 				continue;
 
-			crit("Failed to wait: %s", strerror(errno));
-			return 1; /* TODO: exit? */
+			crit("wait %d", pid);
+			return 1;
 		}
 
 		if (WIFEXITED(status)) {
-			debug("Child %d exited with code %d", pid, WEXITSTATUS(status));
+			info("Child %d exited with code %d", pid, WEXITSTATUS(status));
 			return WEXITSTATUS(status);
 		}
 
@@ -316,16 +330,17 @@ static int builtin_exec(int argc, char *argv[])
 		}
 
 		if (WIFSTOPPED(status)) {
-			debug("Child %d stopped with signal %d", pid, WSTOPSIG(status));
+			info("Child %d stopped with signal %d", pid, WSTOPSIG(status));
 			continue;
 		}
 
 		if (WIFCONTINUED(status)) {
-			debug("Child %d continued", pid);
+			info("Child %d continued", pid);
 			continue;
 		}
 
-		crit("Unexpected status (0x%x)", status);
+		/* Unlikely... */
+		err("Unexpected status (0x%x)", status);
 		break;
 	}
 
@@ -338,7 +353,7 @@ static int power_synaccess(const struct power *power, const char *action)
 	int argc = sizeof argv / sizeof argv[0];
 
 	if (!power->hostname) {
-		user("Undefined power hostname.");
+		err("Undefined power hostname.");
 		return 1;
 	}
 
@@ -362,12 +377,12 @@ static int power_webrelay(const struct power *power, const char *action)
 	int argc = sizeof argv / sizeof argv[0];
 
 	if (!power->hostname) {
-		user("Undefined power hostname.");
+		err("Undefined power hostname.");
 		return 1;
 	}
 
 	if (power->port)
-		notice("Ignoring power port %s.", power->port);
+		info("Ignoring power port.");
 
 	if (strcmp(action, "poweroff") == 0) {
 		argv[3] = "-p";
@@ -386,7 +401,7 @@ static int power_webrelay(const struct power *power, const char *action)
 static int power_exec(const struct power *power, const char *action)
 {
 	if (!power->driver) {
-		user("Power driver required.");
+		err("Power driver required.");
 		return 1;
 	}
 
@@ -399,7 +414,7 @@ static int tty_exec(const struct tty *tty)
 	int argc = sizeof argv / sizeof argv[0];
 
 	if (!argv[1]) {
-		user("TTY device required.");
+		err("TTY device required.");
 		return 1;
 	}
 
@@ -447,7 +462,7 @@ static int remote_exec(const struct remote *remote, int argc, char *argv[])
 
 	/* Fallback to serial driver */
 	if (remote->tty) {
-		notice("Serial driver not implemented.");
+		user("Serial driver not implemented.");
 		return 1;
 	}
 
@@ -457,8 +472,13 @@ static int remote_exec(const struct remote *remote, int argc, char *argv[])
 
 static int command_exec(const struct command *command, int argc, char *argv[])
 {
+	int i;
+
+	for (i = 0; i < argc; i++)
+		debug("arg%d: %s", i, argv[i]);
+
 	if (!command->builtin) {
-		user("No program found for command %s.", argv[0]);
+		err("No builtin for command %s.", argv[0]);
 		return 1;
 	}
 
@@ -480,10 +500,10 @@ static int builtin_help(int argc, char *argv[])
 		/* Describe all commands */
 		for (unit = head.next; unit; unit = unit->next) {
 			if (get_command(unit)) {
-				printf("%s", unit_name(unit));
+				print("%s", unit_name(unit));
 				if (unit->description)
-					printf(" - %s", unit->description);
-				printf("\n");
+					print(" - %s", unit->description);
+				print("\n");
 			}
 		}
 
@@ -494,7 +514,7 @@ static int builtin_help(int argc, char *argv[])
 	for (i = 1; i < argc; i++) {
 		command = get_command_by_name(argv[i]);
 		if (command) {
-			printf("%s\n", command->synopsis ? : argv[i]);
+			print("%s\n", command->synopsis ? : argv[i]);
 		} else {
 			user("Unknown command %s.", argv[i]);
 			ret += 1;
@@ -526,7 +546,7 @@ static int builtin_power(int argc, char *argv[])
 		/* List units with a power unit attached to them */
 		for (unit = head.next; unit; unit = unit->next)
 			if (get_power(unit))
-				printf("%s (%s)\n", unit_name(unit), unit_type(unit));
+				print("%s (%s)\n", unit_name(unit), unit_type(unit));
 	} else {
 		/* Apply shortcut command to all power units */
 		for (unit = head.next; unit; unit = unit->next)
@@ -547,7 +567,7 @@ static int builtin_remote(int argc, char *argv[])
 		/* List remote units */
 		for (unit = head.next; unit; unit = unit->next)
 			if (get_remote(unit))
-				printf("%s (%s)\n", unit_name(unit), unit_type(unit));
+				print("%s (%s)\n", unit_name(unit), unit_type(unit));
 
 		return 0;
 	}
@@ -575,7 +595,7 @@ static int builtin_scp(int argc, char *argv[])
 		/* List directory units */
 		for (unit = head.next; unit; unit = unit->next)
 			if (get_directory(unit))
-				printf("%s (%s)\n", unit_name(unit), unit_type(unit));
+				print("%s (%s)\n", unit_name(unit), unit_type(unit));
 
 		return 0;
 	}
@@ -590,19 +610,19 @@ static int builtin_scp(int argc, char *argv[])
 		} else if (strcmp(argv[i], "-f") == 0) {
 			f = true;
 		} else {
-			user("Unsupported option %s.", argv[i]);
+			err("Unsupported option %s.", argv[i]);
 			return 1;
 		}
 	}
 
 	directory = get_directory_by_name(argv[i]);
 	if (!directory || !directory->path) {
-		user("No directory path attached to unit %s.", argv[i]);
+		user("No directory unit attached to %s.", argv[i]);
 		return 1;
 	}
 
 	if (!t || f) {
-		user("Only uploading to unit %s is supported.", argv[i]);
+		user("Only uploading to %s is supported.", argv[i]);
 		return 1;
 	}
 
@@ -627,7 +647,7 @@ static int builtin_tty(int argc, char *argv[])
 		/* List TTY units */
 		for (unit = head.next; unit; unit = unit->next)
 			if (get_tty(unit))
-				printf("%s (%s)\n", unit_name(unit), unit_type(unit));
+				print("%s (%s)\n", unit_name(unit), unit_type(unit));
 
 		return 0;
 	}
@@ -647,7 +667,7 @@ static int read_string(int fd, char *buf, size_t size)
 
 	n = read(fd, buf, size);
 	if (n == -1) {
-		err("Failed to read.");
+		crit("read %d", fd);
 		return 1;
 	}
 
@@ -667,7 +687,7 @@ static int parse_command(char *buf)
 	char **reloc, **argv = NULL;
 	int ret, argc = 0;
 
-	info("Command: %s", buf);
+	notice("+ %s", buf);
 
 	while (*buf) {
 		/* End of arg */
@@ -679,7 +699,7 @@ static int parse_command(char *buf)
 		/* Beginning of arg */
 		reloc = realloc(argv, ++argc * sizeof(char *));
 		if (!reloc) {
-			err("Failed to reallocate argv.");
+			crit("realloc");
 			ret = 1;
 			goto out;
 		}
@@ -752,10 +772,8 @@ static int read_input(int fd)
 	int ret;
 
 	ret = read_string(fd, buf, sizeof(buf));
-	if (ret) {
-		err("Failed to read input.");
+	if (ret)
 		return 1;
-	}
 
 	return parse_input(buf);
 }
@@ -766,20 +784,23 @@ static int interactive_shell(const char *prompt)
 	int rs, rc = 0;
 
 	/* Greetings */
-	dprintf(STDOUT_FILENO, "Welcome to Kernera restricted shell!\n");
-	dprintf(STDOUT_FILENO, "Try 'help' or ^D to quit.\n");
+	print("Welcome to Kernera restricted shell!\n");
+	print("Try 'help' or ^D to quit.\n");
 
 	for (;;) {
-		dprintf(STDOUT_FILENO, "[%d] %s", rc, prompt);
+		if (rc)
+			print("[%d] %s", rc, prompt);
+		else
+			print("%s", prompt);
+
 		rs = read_string(STDIN_FILENO, buf, sizeof(buf));
 		if (rs) {
-			err("Failed to read input.");
 			rc += rs;
 			break;
 		}
 
 		if (!*buf) {
-			dprintf(STDOUT_FILENO, "\n");
+			print("\n");
 			break;
 		}
 
@@ -795,7 +816,7 @@ static struct unit *insert(int type)
 
 	unit = calloc(1, sizeof(struct unit));
 	if (!unit) {
-		err("Failed to allocate new unit.");
+		crit("calloc");
 		return NULL;
 	}
 
@@ -807,7 +828,7 @@ static struct unit *insert(int type)
 	case UNIT_TYPE_COMMAND:
 		unit->command = calloc(1, sizeof(struct command));
 		if (!unit->command) {
-			err("Failed to allocate command unit.");
+			crit("calloc");
 			free(unit);
 			unit = NULL;
 		}
@@ -815,7 +836,7 @@ static struct unit *insert(int type)
 	case UNIT_TYPE_DIRECTORY:
 		unit->directory = calloc(1, sizeof(struct directory));
 		if (!unit->directory) {
-			err("Failed to allocate directory unit.");
+			crit("calloc");
 			free(unit);
 			unit = NULL;
 		}
@@ -823,7 +844,7 @@ static struct unit *insert(int type)
 	case UNIT_TYPE_LINK:
 		unit->link = calloc(1, sizeof(struct link));
 		if (!unit->link) {
-			err("Failed to allocate link unit.");
+			crit("calloc");
 			free(unit);
 			unit = NULL;
 		}
@@ -831,7 +852,7 @@ static struct unit *insert(int type)
 	case UNIT_TYPE_POWER:
 		unit->power = calloc(1, sizeof(struct power));
 		if (!unit->power) {
-			err("Failed to allocate power unit.");
+			crit("calloc");
 			free(unit);
 			unit = NULL;
 		}
@@ -839,7 +860,7 @@ static struct unit *insert(int type)
 	case UNIT_TYPE_REMOTE:
 		unit->remote = calloc(1, sizeof(struct remote));
 		if (!unit->remote) {
-			err("Failed to allocate remote unit.");
+			crit("calloc");
 			free(unit);
 			unit = NULL;
 		}
@@ -847,7 +868,7 @@ static struct unit *insert(int type)
 	case UNIT_TYPE_TTY:
 		unit->tty = calloc(1, sizeof(struct tty));
 		if (!unit->tty) {
-			err("Failed to allocate tty unit.");
+			crit("calloc");
 			free(unit);
 			unit = NULL;
 		}
@@ -912,17 +933,17 @@ static int open_config(const char *path, char *buf, size_t size)
 	int ret;
 	int fd;
 
+	info("Reading config %s", path);
+
 	fd = open(path, O_RDONLY);
 	if (fd == -1) {
-		err("Failed to open %s.", path);
+		crit("open %s", path);
 		return 1;
 	}
 
 	ret = read_string(fd, buf, size);
-	if (ret) {
-		err("Failed to read %s.", path);
+	if (ret)
 		return ret;
-	}
 
 	for (;;) {
 		n++;
@@ -960,7 +981,6 @@ static int open_config(const char *path, char *buf, size_t size)
 
 			unit = insert(type);
 			if (!unit) {
-				err("Failed to allocate new unit.");
 				ret += 1;
 				return ret; /* Fatal */
 			}
@@ -1306,7 +1326,7 @@ int main(int argc, char *argv[])
 
 		fd = open(argv[optind], O_RDONLY);
 		if (fd == -1) {
-			user("Failed to open %s.", argv[optind]);
+			crit("open %s", argv[optind]);
 			ret = 1;
 			goto out;
 		}
@@ -1322,10 +1342,8 @@ out:
 
 	closelog();
 
-	if (ret) {
-		user("%d error%s occurred.", ret, ret > 1 ? "s" : "");
+	if (ret)
 		return EXIT_FAILURE;
-	}
 
 	return EXIT_SUCCESS;
 }
