@@ -112,7 +112,9 @@ Create a new user \fIbench\fP and define its login shell with:
 .if n .RS 4
 .nf
 # useradd \-s /opt/krsh/krsh \-m bench
-# touch /home/bench/.krshrc
+# mkdir ~bench/.krsh
+# touch ~bench/.krsh/config
+# chown \-R bench:bench ~bench/.krsh
 .fi
 .if n .RE
 .sp
@@ -244,7 +246,7 @@ If there are no operands and the \fB\-c\fP option is not specified, the \fB\-s\f
 If the \fB\-i\fP option is present, or if there are no operands and the shell\(cqs standard input and standard output are attached to a terminal, the shell is considered to be interactive.
 .SH "CONFIGURATION"
 .sp
-By default, krsh looks for the configuration file \fI.krshrc\fP in the current working directory.
+By default, krsh looks for the configuration file \fI~/.krsh/config\fP in the current working directory.
 .sp
 The configuration file is a plain text ini\-style file describing units, inspired from the syntax used in systemd unit files.
 .sp
@@ -285,7 +287,7 @@ Optional string describing the command usage.
 .sp
 The following example adds a "list" command which lists the binary images found in the TFTP directory.
 .sp
-.B \&.krshrc
+.B ~/.krsh/config
 .br
 .sp
 .if n .RS 4
@@ -347,7 +349,7 @@ Real path to the directory passed to \fBscp(1)\fP.
 .sp
 The following example exposes a "tftpboot" directory pointing to \fI/srv/tftp/myboard/\fP used to upload bootable images.
 .sp
-.B \&.krshrc
+.B ~/.krsh/config
 .br
 .sp
 .if n .RS 4
@@ -389,7 +391,7 @@ Name of the remote unit.
 .sp
 The following example describes a network cable connected to the machine "foobar".
 .sp
-.B \&.krshrc
+.B ~/.krsh/config
 .br
 .sp
 .if n .RS 4
@@ -426,7 +428,7 @@ Number of the port on the power distribution unit.
 .sp
 The following example power cycle the "foobar" board connected on the port 3 of a Synaccess device.
 .sp
-.B \&.krshrc
+.B ~/.krsh/config
 .br
 .sp
 .if n .RS 4
@@ -488,7 +490,7 @@ Name of the TTY unit associated with this remote.
 .sp
 The following example executes a command on a remote machine "foobar".
 .sp
-.B \&.krshrc
+.B ~/.krsh/config
 .br
 .sp
 .if n .RS 4
@@ -556,7 +558,7 @@ Optional baudrate for the serial port.
 .sp
 The following example exposes \fI/dev/ttyUSB0\fP as "tty0".
 .sp
-.B krshrc
+.B ~/.krsh/config
 .br
 .sp
 .if n .RS 4

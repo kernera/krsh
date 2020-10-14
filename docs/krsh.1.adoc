@@ -49,7 +49,9 @@ Create a new user _bench_ and define its login shell with:
 
 ----
 # useradd -s /opt/krsh/krsh -m bench
-# touch /home/bench/.krshrc
+# mkdir ~bench/.krsh
+# touch ~bench/.krsh/config
+# chown -R bench:bench ~bench/.krsh
 ----
 
 Test krsh with:
@@ -149,7 +151,7 @@ If the *-i* option is present, or if there are no operands and the shell's stand
 
 == CONFIGURATION
 
-By default, krsh looks for the configuration file _.krshrc_ in the current working directory.
+By default, krsh looks for the configuration file _~/.krsh/config_ in the current working directory.
 
 The configuration file is a plain text ini-style file describing units, inspired from the syntax used in systemd unit files.
 
@@ -183,7 +185,7 @@ Optional string describing the command usage.
 
 The following example adds a "list" command which lists the binary images found in the TFTP directory.
 
-..krshrc
+.~/.krsh/config
 [source,ini]
 ----
 [Command]
@@ -234,7 +236,7 @@ Real path to the directory passed to *scp(1)*.
 
 The following example exposes a "tftpboot" directory pointing to _/srv/tftp/myboard/_ used to upload bootable images.
 
-..krshrc
+.~/.krsh/config
 [source,ini]
 ----
 [Command]
@@ -266,7 +268,7 @@ Name of the remote unit.
 
 The following example describes a network cable connected to the machine "foobar".
 
-..krshrc
+.~/.krsh/config
 [source,ini]
 ----
 [Remote]
@@ -295,7 +297,7 @@ Number of the port on the power distribution unit.
 
 The following example power cycle the "foobar" board connected on the port 3 of a Synaccess device.
 
-..krshrc
+.~/.krsh/config
 [source,ini]
 ----
 [Power]
@@ -339,7 +341,7 @@ Name of the TTY unit associated with this remote.
 
 The following example executes a command on a remote machine "foobar".
 
-..krshrc
+.~/.krsh/config
 [source,ini]
 ----
 [remote]
@@ -373,7 +375,7 @@ Optional baudrate for the serial port.
 
 The following example exposes _/dev/ttyUSB0_ as "tty0".
 
-.krshrc
+.~/.krsh/config
 [source,ini]
 ----
 [TTY]

@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -43,6 +44,8 @@
 
 #define print(fmt, ...) \
 	dprintf(STDOUT_FILENO, fmt, ##__VA_ARGS__)
+
+static char dotdir[PATH_MAX];
 
 struct command;
 struct directory;
@@ -1226,8 +1229,18 @@ static char config[BUFSIZ];
 
 static int load_config(void)
 {
+	char path[PATH_MAX];
 	struct unit *unit;
+	char *home;
 	int i;
+
+	home = getenv("HOME");
+	if (!home) {
+		err("Undefined $HOME environment variable.");
+		return 1;
+	}
+
+	snprintf(dotdir, sizeof(dotdir), "%s/.krsh", home);
 
 	if (atexit(delete))
 		return 1;
@@ -1243,7 +1256,9 @@ static int load_config(void)
 		unit->command->synopsis = builtin_commands[i].synopsis;
 	}
 
-	return open_config(".krshrc", config, sizeof(config));
+	snprintf(path, sizeof(path), "%s/config", dotdir);
+
+	return open_config(path, config, sizeof(config));
 }
 
 static void bye(void)

@@ -558,7 +558,9 @@ krsh does not use a compilation utility yet, therefore its installation is manua
 <div class="listingblock">
 <div class="content">
 <pre># useradd -s /opt/krsh/krsh -m bench
-# touch /home/bench/.krshrc</pre>
+# mkdir ~bench/.krsh
+# touch ~bench/.krsh/config
+# chown -R bench:bench ~bench/.krsh</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -704,7 +706,7 @@ On a system using systemd, debug messages and system errors can be tracked with:
 <h2 id="_configuration">CONFIGURATION</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>By default, krsh looks for the configuration file <em>.krshrc</em> in the current working directory.</p>
+<p>By default, krsh looks for the configuration file <em>~/.krsh/config</em> in the current working directory.</p>
 </div>
 <div class="paragraph">
 <p>The configuration file is a plain text ini-style file describing units, inspired from the syntax used in systemd unit files.</p>
@@ -756,7 +758,7 @@ It must be absolute or relative to the shell binary and point to an executable f
 <p>The following example adds a "list" command which lists the binary images found in the TFTP directory.</p>
 </div>
 <div class="listingblock">
-<div class="title">.krshrc</div>
+<div class="title">~/.krsh/config</div>
 <div class="content">
 <pre class="highlight"><code class="language-ini" data-lang="ini">[Command]
 Name=list
@@ -816,7 +818,7 @@ Only uploading is allowed at the moment.</p>
 <p>The following example exposes a "tftpboot" directory pointing to <em>/srv/tftp/myboard/</em> used to upload bootable images.</p>
 </div>
 <div class="listingblock">
-<div class="title">.krshrc</div>
+<div class="title">~/.krsh/config</div>
 <div class="content">
 <pre class="highlight"><code class="language-ini" data-lang="ini">[Command]
 Name=tftpboot
@@ -860,7 +862,7 @@ Such unit has no usage at the moment except for documentation purpose.</p>
 <p>The following example describes a network cable connected to the machine "foobar".</p>
 </div>
 <div class="listingblock">
-<div class="title">.krshrc</div>
+<div class="title">~/.krsh/config</div>
 <div class="content">
 <pre class="highlight"><code class="language-ini" data-lang="ini">[Remote]
 Name=foobar
@@ -899,7 +901,7 @@ The list of supported power drivers include <strong>synaccess</strong> (for the 
 <p>The following example power cycle the "foobar" board connected on the port 3 of a Synaccess device.</p>
 </div>
 <div class="listingblock">
-<div class="title">.krshrc</div>
+<div class="title">~/.krsh/config</div>
 <div class="content">
 <pre class="highlight"><code class="language-ini" data-lang="ini">[Power]
 Name=pdu3
@@ -957,7 +959,7 @@ A remote unit groups a directory, power and TTY, and describes the logging into 
 <p>The following example executes a command on a remote machine "foobar".</p>
 </div>
 <div class="listingblock">
-<div class="title">.krshrc</div>
+<div class="title">~/.krsh/config</div>
 <div class="content">
 <pre class="highlight"><code class="language-ini" data-lang="ini">[remote]
 Name=foobar
@@ -1021,7 +1023,7 @@ Non-root system users of the shell must be part of a specific group to access se
 <p>The following example exposes <em>/dev/ttyUSB0</em> as "tty0".</p>
 </div>
 <div class="listingblock">
-<div class="title">krshrc</div>
+<div class="title">~/.krsh/config</div>
 <div class="content">
 <pre class="highlight"><code class="language-ini" data-lang="ini">[TTY]
 Name=tty0
