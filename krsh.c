@@ -81,7 +81,6 @@ struct unit {
 };
 
 struct command {
-	const char *path;
 	const char *synopsis;
 	int (*builtin)(int argc, char *argv[]);
 };
@@ -286,9 +285,17 @@ static const char *unit_type(const struct unit *unit)
 static int builtin_exec(int argc, char *argv[])
 {
 	char *exec_argv[argc + 1];
+	char pathname[PATH_MAX];
 	int status;
 	pid_t pid;
 	int i;
+
+	if (*argv[0] == '/')
+		snprintf(pathname, sizeof(pathname), "%s", argv[0]);
+	else
+		snprintf(pathname, sizeof(pathname), "%s/commands/%s", dotdir, argv[0]);
+
+	debug("pathname: %s", pathname);
 
 	for (i = 0; i < argc; i++) {
 		exec_argv[i] = argv[i];
@@ -304,7 +311,7 @@ static int builtin_exec(int argc, char *argv[])
 	}
 
 	if (pid == 0) {
-		if (execv(exec_argv[0], exec_argv) == -1) {
+		if (execv(pathname, exec_argv) == -1) {
 			if (errno == ENOENT)
 				status = 127;
 			else
@@ -334,7 +341,7 @@ static int builtin_exec(int argc, char *argv[])
 				errno = 0;
 
 			if (errno)
-				crit("execv %s", exec_argv[0]);
+				crit("execv %s", pathname);
 
 			info("Child %d exited with code %d", pid, status);
 
@@ -366,7 +373,7 @@ static int builtin_exec(int argc, char *argv[])
 
 static int power_synaccess(const struct power *power, const char *action)
 {
-	char *argv[] = { "bin/power-synaccess", "-H", (char *) power->hostname, NULL, (char *) power->port };
+	char *argv[] = { "power-synaccess", "-H", (char *) power->hostname, NULL, (char *) power->port };
 	int argc = sizeof argv / sizeof argv[0];
 
 	if (!power->hostname) {
@@ -390,7 +397,7 @@ static int power_synaccess(const struct power *power, const char *action)
 
 static int power_webrelay(const struct power *power, const char *action)
 {
-	char *argv[] = { "bin/power-webrelay", "-H", (char *) power->hostname, NULL };
+	char *argv[] = { "power-webrelay", "-H", (char *) power->hostname, NULL };
 	int argc = sizeof argv / sizeof argv[0];
 
 	if (!power->hostname) {
@@ -427,7 +434,7 @@ static int power_exec(const struct power *power, const char *action)
 
 static int tty_exec(const struct tty *tty)
 {
-	char *argv[] = { "bin/tty-dtach-picocom", (char *) tty->device, (char *) tty->baudrate };
+	char *argv[] = { "tty-dtach-picocom", (char *) tty->device, (char *) tty->baudrate };
 	int argc = sizeof argv / sizeof argv[0];
 
 	if (!argv[1]) {
@@ -494,16 +501,10 @@ static int command_exec(const struct command *command, int argc, char *argv[])
 	for (i = 0; i < argc; i++)
 		debug("arg%d: %s", i, argv[i]);
 
-	if (!command->builtin) {
-		err("No builtin for command %s.", argv[0]);
-		return 1;
-	}
+	if (command->builtin)
+		return command->builtin(argc, argv);
 
-	/* If a pathname is provided, override the command name */
-	if (command->path)
-		argv[0] = (char *) command->path;
-
-	return command->builtin(argc, argv);
+	return builtin_exec(argc, argv);
 }
 
 static int builtin_help(int argc, char *argv[])
@@ -1035,10 +1036,7 @@ static int open_config(const char *path, char *buf, size_t size)
 			/* Type-specific properties */
 			switch (unit->type) {
 			case UNIT_TYPE_COMMAND:
-				if (strcmp(prop, "Path") == 0) {
-					unit->command->path = begin;
-					unit->command->builtin = builtin_exec;
-				} else if (strcmp(prop, "Synopsis") == 0) {
+				if (strcmp(prop, "Synopsis") == 0) {
 					unit->command->synopsis = begin;
 				} else {
 					err("%s:%d: Unknown command property %s.", path, n, prop);

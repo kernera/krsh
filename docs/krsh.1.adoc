@@ -176,10 +176,6 @@ A command is a generic user-specified program added to the existing set of comma
 The unit _Name=_ identifies the command interpreted by the shell.
 Additional arguments are passed to the program as is.
 
-Path=::
-Pathname of the program passed to *execv(3)*.
-It must be absolute or relative to the shell binary and point to an executable file.
-
 Synopsis=::
 Optional string describing the command usage.
 
