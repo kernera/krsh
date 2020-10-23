@@ -302,12 +302,13 @@ static int builtin_exec(int argc, char *argv[])
 
 	if (pid == 0) {
 		if (execv(exec_argv[0], exec_argv) == -1) {
-			perror("execv"); /* TODO: syslog instead of parent's stderr? */
-			_exit(EXIT_FAILURE);
-		}
+			if (errno == ENOENT)
+				status = 127;
+			else
+				status = 126;
 
-		/* Unreachable... */
-		_exit(EXIT_SUCCESS);
+			_exit(status);
+		}
 	}
 
 	for (;;) {
@@ -320,8 +321,21 @@ static int builtin_exec(int argc, char *argv[])
 		}
 
 		if (WIFEXITED(status)) {
-			info("Child %d exited with code %d", pid, WEXITSTATUS(status));
-			return WEXITSTATUS(status);
+			status = WEXITSTATUS(status);
+
+			if (status == 127)
+				errno = ENOENT;
+			else if (status == 126)
+				errno = EACCES;
+			else
+				errno = 0;
+
+			if (errno)
+				crit("execv %s", exec_argv[0]);
+
+			info("Child %d exited with code %d", pid, status);
+
+			return status;
 		}
 
 		if (WIFSIGNALED(status)) {
