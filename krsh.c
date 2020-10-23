@@ -714,8 +714,8 @@ static int parse_command(char *buf)
 		reloc = realloc(argv, ++argc * sizeof(char *));
 		if (!reloc) {
 			crit("realloc");
-			ret = 1;
-			goto out;
+			free(argv);
+			return 1;
 		}
 		argv = reloc;
 		argv[argc - 1] = buf;
@@ -725,20 +725,17 @@ static int parse_command(char *buf)
 			buf++;
 	}
 
-	if (!argv) {
-		ret = 0;
-		goto out;
-	}
+	if (!argv)
+		return 0;
 
 	command = get_command_by_name(argv[0]);
 	if (!command) {
 		user("Unknown command %s, try 'help'.", argv[0]);
-		ret = 1;
-		goto out;
+		free(argv);
+		return 1;
 	}
 
 	ret = command_exec(command, argc, argv);
-out:
 	free(argv);
 	return ret;
 }
