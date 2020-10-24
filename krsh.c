@@ -1222,10 +1222,15 @@ static const struct builtin_command builtin_commands[] = {
 	NULL
 };
 
-static int builtin(void)
+static char config[BUFSIZ];
+
+static int load_config(void)
 {
 	struct unit *unit;
 	int i;
+
+	if (atexit(delete))
+		return 1;
 
 	for (i = 0; builtin_commands[i].name; i++) {
 		unit = insert(UNIT_TYPE_COMMAND);
@@ -1238,6 +1243,26 @@ static int builtin(void)
 		unit->command->synopsis = builtin_commands[i].synopsis;
 	}
 
+	return open_config(".krshrc", config, sizeof(config));
+}
+
+static void bye(void)
+{
+	info("Closing shell session.");
+	closelog();
+}
+
+static int init(void)
+{
+	openlog(NULL, LOG_PID, LOG_USER);
+	info("Opening shell session.");
+
+	if (atexit(bye))
+		return 1;
+
+	if (load_config())
+		return 1;
+
 	return 0;
 }
 
@@ -1247,18 +1272,15 @@ int main(int argc, char *argv[])
 	bool standard_input = false;
 	bool interactive = false;
 	bool login = false;
-	char buf[BUFSIZ];
-	int ret;
 	int fd;
 	int c;
+
+	if (init())
+		return EXIT_FAILURE;
 
 	/* Unused */
 	if (**argv == '-')
 		login = true;
-
-	openlog(NULL, LOG_PID, LOG_USER);
-
-	info("Opening shell session.");
 
 	for (c = 0; c < argc; c++)
 		debug("arg%d: %s", c, argv[c]);
@@ -1276,18 +1298,9 @@ int main(int argc, char *argv[])
 			break;
 		default:
 			user("%s: try command 'help'.", argv[0]);
-			ret = 1;
-			goto out;
+			return EXIT_FAILURE;
 		}
 	}
-
-	ret = builtin();
-	if (ret)
-		goto out;
-
-	ret = open_config(".krshrc", buf, sizeof(buf));
-	if (ret)
-		goto out;
 
 	if (argc - optind == 0)
 		standard_input = true;
@@ -1298,63 +1311,49 @@ int main(int argc, char *argv[])
 	if (command_string) {
 		if (argc - optind == 0) {
 			user("Missing command string.");
-			ret = 1;
-			goto out;
+			return EXIT_FAILURE;
 		}
 
 		if (argc - optind > 1) {
 			user("Overriding argv is not supported.");
-			ret = 1;
-			goto out;
+			return EXIT_FAILURE;
 		}
 
-		ret = parse_input(argv[optind]);
-		goto out;
+		if (parse_input(argv[optind]))
+			return EXIT_FAILURE;
 	} else if (standard_input) {
 		if (argc - optind > 0) {
 			user("Overriding argv is not supported.");
-			ret = 1;
-			goto out;
+			return EXIT_FAILURE;
 		}
 
-		if (interactive)
-			ret = interactive_shell("krsh> ");
-		else
-			ret = read_input(STDIN_FILENO);
-		goto out;
+		if (interactive) {
+			if (interactive_shell("krsh> "))
+				return EXIT_FAILURE;
+		} else {
+			if (read_input(STDIN_FILENO))
+				return EXIT_FAILURE;
+		}
 	} else {
 		if (argc - optind == 0) {
 			user("Missing command file.");
-			ret = 1;
-			goto out;
+			return EXIT_FAILURE;
 		}
 
 		if (argc - optind > 1) {
 			user("Overriding argv is not supported.");
-			ret = 1;
-			goto out;
+			return EXIT_FAILURE;
 		}
 
 		fd = open(argv[optind], O_RDONLY);
 		if (fd == -1) {
 			crit("open %s", argv[optind]);
-			ret = 1;
-			goto out;
+			return EXIT_FAILURE;
 		}
 
-		ret = read_input(fd);
-		goto out;
+		if (read_input(fd))
+			return EXIT_FAILURE;
 	}
-
-out:
-	delete();
-
-	info("Closing shell session.");
-
-	closelog();
-
-	if (ret)
-		return EXIT_FAILURE;
 
 	return EXIT_SUCCESS;
 }
