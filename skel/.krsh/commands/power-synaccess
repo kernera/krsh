@@ -1,37 +1,37 @@
 #!/bin/sh
 #
-# Synaccess netBooter NP-08 command line
+# krsh power driver for Synaccess netBooter NP-08
 
-SYNACCESS_USER=${SYNACCESS_USER:-admin}
-SYNACCESS_PASS=${SYNACCESS_PASS:-admin}
-SYNACCESS_HOST=${SYNACCESS_HOST:-netbooter}
+KRSH_POWER_USER=${KRSH_POWER_USER:-admin}
+KRSH_POWER_PASSWORD=${KRSH_POWER_PASSWORD:-admin}
+KRSH_POWER_HOSTNAME=${KRSH_POWER_HOSTNAME:-netbooter}
+KRSH_POWER_PORT=${KRSH_POWER_PORT:-0}
 
 print () {
   [ -n "$QUIET" ] || printf "$@"
 }
 
+# get <page>
 get () {
   # FIXME cannot error out if the host is unavailable
-  curl -Ss -u $SYNACCESS_USER:$SYNACCESS_PASS http://$SYNACCESS_HOST/$1
+  curl -Ss -u $KRSH_POWER_USER:$KRSH_POWER_PASSWORD http://$KRSH_POWER_HOSTNAME/$1
 }
 
 status () {
-  get synOpStatus.shtml | grep pwrRb$1.cgi | grep -oP '(?<=led)on|off(?=\.gif)'
+  get synOpStatus.shtml | grep pwrRb$KRSH_POWER_PORT.cgi | grep -oP '(?<=led)on|off(?=\.gif)'
 }
 
 sw () {
-  >/dev/null get pwrSw$1.cgi # toggles on/off
+  >/dev/null get pwrSw$KRSH_POWER_PORT.cgi # toggles on/off
 }
 
 rb () {
-  >/dev/null get pwrRb$1.cgi # toggles twice
+  >/dev/null get pwrRb$KRSH_POWER_PORT.cgi # toggles twice
 }
 
+# wait <status>...
 wait () {
-  port=$1
-  shift
-
-  print $port
+  print $KRSH_POWER_PORT
   for i
   do
     while true
@@ -39,7 +39,7 @@ wait () {
       # Wait and trigger a status request otherwise the action may be ignored
       print .
       sleep .5
-      [ $(status $port) = $i ] && break
+      [ $(status) = $i ] && break
     done
     print $i
   done
@@ -47,43 +47,35 @@ wait () {
 }
 
 on () {
-  if [ $(status $1) = off ]
+  if [ $(status) = off ]
   then
-    sw $1
-    wait $1 on
+    sw
+    wait on
   fi
 }
 
 off () {
-  if [ $(status $1) = on ]
+  if [ $(status) = on ]
   then
-    sw $1
-    wait $1 off
+    sw
+    wait off
   fi
 }
 
 reboot () {
-  if [ $(status $1) = on ]
+  if [ $(status) = on ]
   then
-    rb $1
-    wait $1 off on
+    rb
+    wait off on
   else
-    sw $1
-    wait $1 on
+    sw
+    wait on
   fi
 }
 
-while getopts "H:U:P:o:p:r:s:q" o
-do
-  case "${o}" in
-    H) SYNACCESS_HOST=${OPTARG} ;;
-    U) SYNACCESS_USER=${OPTARG} ;;
-    P) SYNACCESS_PASS=${OPTARG} ;;
-    q) QUIET=1 ;;
-    o) on ${OPTARG} ;;
-    p) off ${OPTARG} ;;
-    r) reboot ${OPTARG} ;;
-    s) status ${OPTARG} ;;
-    *) exit 1 ;;
-  esac
-done
+case $1 in
+  poweron) on ;;
+  poweroff) off ;;
+  reboot) reboot ;;
+  *) exit 1 ;;
+esac

@@ -284,6 +284,7 @@ A power unit describes a single port of a power distribution unit.
 Driver=::
 Name of the builtin driver used to control the power distribution unit.
 The list of supported power drivers include *synaccess* (for the NetBooter family) and *webrelay* (for the WebRelay device).
+A driver is a command named *power-_Driver=_* executed with the environment variables _KRSH_POWER_HOSTNAME_ and _KRSH_POWER_PORT_, and _poweron_, _poweroff_ or _reboot_ as the first argument.
 
 Hostname=::
 Network name or address of the power distribution unit.

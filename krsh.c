@@ -98,9 +98,7 @@ struct link {
 struct power {
 	const char *hostname;
 	const char *port;
-
-	/* TODO: make power drivers "discrete" commands? */
-	int (*driver)(const struct power *power, const char *action);
+	const char *driver;
 };
 
 struct remote {
@@ -385,65 +383,29 @@ static int builtin_exec(int argc, char *argv[])
 	return 1;
 }
 
-static int power_synaccess(const struct power *power, const char *action)
-{
-	char *argv[] = { "power-synaccess", "-H", (char *) power->hostname, NULL, (char *) power->port };
-	int argc = sizeof argv / sizeof argv[0];
-
-	if (!power->hostname) {
-		err("Undefined power hostname.");
-		return 1;
-	}
-
-	if (strcmp(action, "poweroff") == 0) {
-		argv[3] = "-p";
-	} else if (strcmp(action, "poweron") == 0) {
-		argv[3] = "-o";
-	} else if (strcmp(action, "reboot") == 0) {
-		argv[3] = "-r";
-	} else {
-		user("Unsupported command %s.", action);
-		return 1;
-	}
-
-	return builtin_exec(argc, argv);
-}
-
-static int power_webrelay(const struct power *power, const char *action)
-{
-	char *argv[] = { "power-webrelay", "-H", (char *) power->hostname, NULL };
-	int argc = sizeof argv / sizeof argv[0];
-
-	if (!power->hostname) {
-		err("Undefined power hostname.");
-		return 1;
-	}
-
-	if (power->port)
-		info("Ignoring power port.");
-
-	if (strcmp(action, "poweroff") == 0) {
-		argv[3] = "-p";
-	} else if (strcmp(action, "poweron") == 0) {
-		argv[3] = "-o";
-	} else if (strcmp(action, "reboot") == 0) {
-		argv[3] = "-r";
-	} else {
-		user("Unsupported command %s.", action);
-		return 1;
-	}
-
-	return builtin_exec(argc, argv);
-}
-
 static int power_exec(const struct power *power, const char *action)
 {
+	char name[NAME_MAX];
+	int argc = 2;
+	char *argv[argc];
+	const char *power_env[ENV_MAX] = {
+		"KRSH_POWER_HOSTNAME", power->hostname ? : "",
+		"KRSH_POWER_PORT", power->port ? : "",
+	};
+
+	memcpy(env, power_env, sizeof(env));
+
 	if (!power->driver) {
 		err("Power driver required.");
 		return 1;
 	}
 
-	return power->driver(power, action);
+	snprintf(name, sizeof(name), "power-%s", power->driver);
+
+	argv[0] = name;
+	argv[1] = (char *) action;
+
+	return builtin_exec(argc, argv);
 }
 
 static int tty_exec(const struct tty *tty)
@@ -1083,14 +1045,7 @@ static int open_config(const char *path, char *buf, size_t size)
 				break;
 			case UNIT_TYPE_POWER:
 				if (strcmp(prop, "Driver") == 0) {
-					if (strcmp(begin, "synaccess") == 0) {
-						unit->power->driver = power_synaccess;
-					} else if (strcmp(begin, "webrelay") == 0) {
-						unit->power->driver = power_webrelay;
-					} else {
-						err("%s:%d: Unknown power type %s.", path, n, begin);
-						ret += 1;
-					}
+					unit->power->driver = begin;
 				} else if (strcmp(prop, "Hostname") == 0) {
 					unit->power->hostname = begin;
 				} else if (strcmp(prop, "Port") == 0) {
