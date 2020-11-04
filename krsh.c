@@ -282,6 +282,10 @@ static const char *unit_type(const struct unit *unit)
 	}
 }
 
+#define ENV_MAX 20
+
+static const char *env[ENV_MAX];
+
 static int builtin_exec(int argc, char *argv[])
 {
 	char *exec_argv[argc + 1];
@@ -304,6 +308,10 @@ static int builtin_exec(int argc, char *argv[])
 
 	exec_argv[i] = NULL;
 
+	for (i = 0; i < ENV_MAX; i += 2)
+		if (env[i])
+			debug("%s=%s", env[i], env[i + 1]);
+
 	pid = fork();
 	if (pid == -1) {
 		crit("fork");
@@ -311,6 +319,10 @@ static int builtin_exec(int argc, char *argv[])
 	}
 
 	if (pid == 0) {
+		for (i = 0; i < ENV_MAX; i += 2)
+			if (env[i] && setenv(env[i], env[i + 1], 1) == -1)
+				_exit(1);
+
 		if (execv(pathname, exec_argv) == -1) {
 			if (errno == ENOENT)
 				status = 127;
@@ -320,6 +332,8 @@ static int builtin_exec(int argc, char *argv[])
 			_exit(status);
 		}
 	}
+
+	memset(env, 0, sizeof(env));
 
 	for (;;) {
 		if (waitpid(pid, &status, WCONTINUED | WUNTRACED) == -1) {
