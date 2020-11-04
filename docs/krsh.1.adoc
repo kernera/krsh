@@ -131,7 +131,7 @@ All non-user messages are sent to the system logger.
 On a system using systemd, debug messages and system errors can be tracked with:
 
 ----
-# journalctl -f -t krsh -t -krsh
+# journalctl -f -t krsh
 ----
 
 == OPTIONS

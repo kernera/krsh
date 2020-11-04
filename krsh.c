@@ -1236,7 +1236,7 @@ static void bye(void)
 
 static int init(void)
 {
-	openlog(NULL, LOG_PID, LOG_USER);
+	openlog("krsh", LOG_PID, LOG_USER);
 	info("Opening shell session.");
 
 	if (atexit(bye))
