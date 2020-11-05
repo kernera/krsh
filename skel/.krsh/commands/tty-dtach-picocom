@@ -1,12 +1,10 @@
 #!/bin/sh
 
-[ $# -gt 0 ] || exit 1
-
-device=${1}
-session=/tmp/dtach.picocom.$(basename $device).session
-baudrate=${2:-115200}
+KRSH_TTY_DEVICE=${KRSH_TTY_DEVICE:-/dev/null}
+KRSH_TTY_SESSION=/tmp/dtach.picocom.$(basename $KRSH_TTY_DEVICE).session
+KRSH_TTY_BAUDRATE=${KRSH_TTY_BAUDRATE:-115200}
 
 echo "Press Enter to continue, then ^\ to detach."
 read
 
-exec dtach -A $session picocom -b $baudrate $device
+exec dtach -A $KRSH_TTY_SESSION picocom -b $KRSH_TTY_BAUDRATE $KRSH_TTY_DEVICE

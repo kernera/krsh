@@ -1,9 +1,7 @@
 #!/bin/sh
 
-[ $# -gt 0 ] || exit 1
+KRSH_TTY_DEVICE=${KRSH_TTY_DEVICE:-/dev/null}
+KRSH_TTY_SESSION=$(basename $KRSH_TTY_DEVICE)
+KRSH_TTY_BAUDRATE=${KRSH_TTY_BAUDRATE:-115200}
 
-device=${1}
-session=$(basename $device)
-baudrate=${2:-115200}
-
-exec screen -x -R $session $device $baudrate
+exec screen -x -R $KRSH_TTY_SESSION $KRSH_TTY_DEVICE $KRSH_TTY_BAUDRATE

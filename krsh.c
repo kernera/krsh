@@ -410,17 +410,19 @@ static int power_exec(const struct power *power, const char *action)
 
 static int tty_exec(const struct tty *tty)
 {
-	char *argv[] = { "tty-dtach-picocom", (char *) tty->device, (char *) tty->baudrate };
+	char *argv[] = { "tty-dtach-picocom" };
 	int argc = sizeof argv / sizeof argv[0];
+	const char *tty_env[ENV_MAX] = {
+		"KRSH_TTY_DEVICE", tty->device ? : "",
+		"KRSH_TTY_BAUDRATE", tty->baudrate ? : "115200",
+	};
 
-	if (!argv[1]) {
+	memcpy(env, tty_env, sizeof(env));
+
+	if (!tty->device) {
 		err("TTY device required.");
 		return 1;
 	}
-
-	/* Baudrate is optional */
-	if (!argv[2])
-		argc--;
 
 	return builtin_exec(argc, argv);
 }
