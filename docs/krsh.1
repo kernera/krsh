@@ -111,10 +111,7 @@ Create a new user \fIbench\fP and define its login shell with:
 .sp
 .if n .RS 4
 .nf
-# useradd \-s /opt/krsh/krsh \-m bench
-# mkdir ~bench/.krsh
-# touch ~bench/.krsh/config
-# chown \-R bench:bench ~bench/.krsh
+# useradd \-s /opt/krsh/krsh \-m \-k /opt/krsh/skel bench
 .fi
 .if n .RE
 .sp

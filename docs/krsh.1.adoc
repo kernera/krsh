@@ -48,10 +48,7 @@ Download and compile krsh from source with:
 Create a new user _bench_ and define its login shell with:
 
 ----
-# useradd -s /opt/krsh/krsh -m bench
-# mkdir ~bench/.krsh
-# touch ~bench/.krsh/config
-# chown -R bench:bench ~bench/.krsh
+# useradd -s /opt/krsh/krsh -m -k /opt/krsh/skel bench
 ----
 
 Test krsh with:
