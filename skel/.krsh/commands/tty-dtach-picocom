@@ -1,8 +1,10 @@
 #!/bin/sh
 
 KRSH_TTY_DEVICE=${KRSH_TTY_DEVICE:-/dev/null}
-KRSH_TTY_SESSION=/tmp/dtach.picocom.$(basename $KRSH_TTY_DEVICE).session
+KRSH_TTY_SESSION=~/.krsh/sessions/$(basename $KRSH_TTY_DEVICE)
 KRSH_TTY_BAUDRATE=${KRSH_TTY_BAUDRATE:-115200}
+
+mkdir -p $(dirname $KRSH_TTY_SESSION)
 
 echo "Press Enter to continue, then ^\ to detach."
 read
