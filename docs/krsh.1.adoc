@@ -39,10 +39,8 @@ NOTE: krsh does not use a compilation utility yet, therefore its installation is
 Download and compile krsh from source with:
 
 ----
-# cd /opt
-# git clone https://github.com/kernera/krsh
-# cd krsh
-# make krsh
+# git clone https://github.com/kernera/krsh /opt/krsh
+# make -C /opt/krsh krsh
 ----
 
 Create a new user _bench_ and define its login shell with:
