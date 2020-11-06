@@ -57,7 +57,7 @@ Create a new user _bench_ and define its login shell with:
 Test krsh with:
 
 ----
-# su -l bench help
+# su -l bench -c help
 ----
 
 Assuming that key authentication is already configured on the server, it is convenient to configure SSH on a remote client with the following host:
