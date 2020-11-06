@@ -34,7 +34,7 @@ Therefore there is no convention to describe or split the access to a embedded w
 
 This section describes how to install krsh from source as a login shell for a new user _bench_.
 
-NOTE: krsh does not use a compilation utility yet, therefore its installation is manual and executable paths are hardcoded relative to the current working directory.
+NOTE: krsh is not packaged yet and does not use a compilation utility yet, therefore its installation is manual.
 
 Download and compile krsh from source with:
 
